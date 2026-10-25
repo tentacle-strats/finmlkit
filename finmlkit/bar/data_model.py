@@ -162,6 +162,11 @@ class TradesData:
         self._data = pd.DataFrame({'timestamp': ts, 'price': px, 'amount': qty, 'id': id})
 
         self.is_buyer_maker = is_buyer_maker
+        if is_buyer_maker is not None and preprocess:
+            if len(is_buyer_maker) != len(self._data):
+                raise ValueError("is_buyer_maker must have the same length as the trades")
+            # Carried as a column so that sorting and de-duplicating re-order it together with its trade
+            self._data['is_buyer_maker'] = is_buyer_maker
         if side is not None:
             self._data['side'] = side
         self._orig_timestamp_unit = timestamp_unit if timestamp_unit else self._infer_timestamp_unit()
@@ -328,6 +333,10 @@ class TradesData:
         Merge trades that occur at the same timestamp and price level.
         """
         logger.info('Merging split trades (same timestamps) on same price level...')
+
+        if 'is_buyer_maker' in self._data.columns:
+            # re-ordered together with the other columns by _sort_trades
+            self.is_buyer_maker = self._data['is_buyer_maker'].to_numpy(dtype=np.bool_)
 
         ts, px, am, side = merge_split_trades(
             self.data['timestamp'].values.astype(np.int64),
